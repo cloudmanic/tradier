@@ -52,21 +52,49 @@ mv build/tradier /usr/local/bin/
 - A [Tradier](https://tradier.com) brokerage or sandbox account with an API key
 - Go 1.24+ (only if building from source)
 
+## Shell Completion
+
+Tradier CLI supports tab completion for commands, subcommands, and flags.
+
+### Zsh
+
+Add this line to your `~/.zshrc`:
+
+```bash
+source <(tradier completion zsh)
+```
+
+Then restart your shell or run `source ~/.zshrc`.
+
+### Bash
+
+Add this line to your `~/.bashrc`:
+
+```bash
+source <(tradier completion bash)
+```
+
+### Fish
+
+```bash
+tradier completion fish | source
+```
+
+To make it permanent:
+
+```bash
+tradier completion fish > ~/.config/fish/completions/tradier.fish
+```
+
 ## Quick Start
 
-### 1. Configure your API key
+### 1. Configure your API keys
 
 ```bash
 tradier init
 ```
 
-This prompts for your API key and optional default account ID, then saves the configuration to `~/.config/tradier/config.json`.
-
-For sandbox accounts, use the `--sandbox` flag:
-
-```bash
-tradier init --sandbox
-```
+This prompts for your production and sandbox API keys and optional account IDs, then saves the configuration to `~/.config/tradier/config.json`. You can skip either environment by pressing Enter.
 
 ### 2. Start querying
 
@@ -93,9 +121,17 @@ Configuration is stored at `~/.config/tradier/config.json` with `0600` permissio
 
 | Field | Description |
 |-------|-------------|
-| `api_key` | Your Tradier API access token |
-| `sandbox` | `true` for sandbox environment, `false` for production |
-| `account_id` | Default account ID (avoids needing `--account-id` on every command) |
+| `production_api_key` | Your production API access token |
+| `production_account_id` | Default production account ID |
+| `sandbox_api_key` | Your sandbox API access token |
+| `sandbox_account_id` | Default sandbox account ID |
+
+Both environments are stored in the same config file. Use the `--sandbox` flag on any command to switch:
+
+```bash
+tradier accounts balance              # uses production
+tradier accounts balance --sandbox    # uses sandbox
+```
 
 - **Production URL:** `https://api.tradier.com`
 - **Sandbox URL:** `https://sandbox.tradier.com`
@@ -330,6 +366,7 @@ tradier markets clock --json | jq '.clock.state'
 | Flag | Description |
 |------|-------------|
 | `--json` | Output raw JSON instead of formatted tables |
+| `--sandbox` | Use the sandbox environment instead of production |
 | `--account-id` | Override the default account ID from config (on account/trading commands) |
 | `--version` | Print the CLI version |
 | `--help` | Show help for any command |
