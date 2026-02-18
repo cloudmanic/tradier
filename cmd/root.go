@@ -15,10 +15,18 @@ import (
 // jsonOutput controls whether output is rendered as JSON instead of tables.
 var jsonOutput bool
 
+// version is the current version of the CLI, injected at build time
+// via -ldflags "-X github.com/cloudmanic/tradier/cmd.version=vX.Y.Z".
+// Defaults to "dev" for local development builds.
+var version = "dev"
+
+// rootCmd is the base command for the Tradier CLI. All subcommands
+// are registered as children of this command.
 var rootCmd = &cobra.Command{
-	Use:   "tradier",
-	Short: "CLI tool for the Tradier brokerage API",
-	Long:  "A command-line interface for interacting with the Tradier brokerage API. Supports account management, market data, trading, watchlists, and streaming.",
+	Use:     "tradier",
+	Short:   "CLI tool for the Tradier brokerage API",
+	Long:    "A command-line interface for interacting with the Tradier brokerage API. Supports account management, market data, trading, watchlists, and streaming.",
+	Version: version,
 }
 
 func init() {

@@ -1,11 +1,17 @@
+# Copyright 2026 Cloudmanic Labs, LLC. All rights reserved.
+# Date: 2026-02-17
+
 BINARY_NAME=tradier
 BUILD_DIR=build
+MODULE=$(shell go list -m)
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS=-X $(MODULE)/cmd.version=$(VERSION)
 
-.PHONY: build test clean install lint vet fmt run help
+.PHONY: build test test-verbose test-cover test-cover-html clean install vet fmt lint tidy cross-build run help
 
-## build: Compile the binary
+## build: Compile the binary for the current platform
 build:
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) .
+	go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) .
 
 ## test: Run all unit tests
 test:
@@ -17,20 +23,25 @@ test-verbose:
 
 ## test-cover: Run tests with coverage report
 test-cover:
-	go test ./... -coverprofile=$(BUILD_DIR)/coverage.out
-	go tool cover -func=$(BUILD_DIR)/coverage.out
+	go test ./... -coverprofile=coverage.out
+	@echo ""
+	@echo "Coverage summary:"
+	@go tool cover -func=coverage.out
 
 ## test-cover-html: Open coverage report in browser
 test-cover-html: test-cover
-	go tool cover -html=$(BUILD_DIR)/coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo ""
+	@echo "HTML report: coverage.html"
 
-## clean: Remove build artifacts
+## clean: Remove build artifacts and coverage files
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f coverage.out coverage.html
 
 ## install: Build and install the binary to GOPATH/bin
 install:
-	go install .
+	go install -ldflags="$(LDFLAGS)" .
 
 ## vet: Run go vet
 vet:
@@ -40,14 +51,22 @@ vet:
 fmt:
 	go fmt ./...
 
-## lint: Run vet and check formatting
-lint: vet
-	@test -z "$$(gofmt -l .)" || (echo "Files need formatting:" && gofmt -l . && exit 1)
+## lint: Run fmt and vet together
+lint: fmt vet
 
 ## tidy: Tidy and verify module dependencies
 tidy:
 	go mod tidy
 	go mod verify
+
+## cross-build: Build for all release platforms
+cross-build: clean
+	mkdir -p dist
+	GOOS=darwin  GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY_NAME)-darwin-amd64 .
+	GOOS=darwin  GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY_NAME)-darwin-arm64 .
+	GOOS=linux   GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY_NAME)-linux-amd64 .
+	GOOS=linux   GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY_NAME)-linux-arm64 .
+	GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY_NAME)-windows-amd64.exe .
 
 ## run: Build and run with optional ARGS (e.g. make run ARGS="markets quotes --symbols AAPL")
 run: build
@@ -57,4 +76,4 @@ run: build
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@sed -n 's/^## //p' $(MAKEFILE_LIST) | column -t -s ':'
+	@sed -n 's/^## //p' $(MAKEFILE_LIST) | column -t -s ':' | sed 's/^/  /'
