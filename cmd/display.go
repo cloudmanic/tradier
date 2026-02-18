@@ -279,6 +279,7 @@ func printKV(pairs [][2]string) {
 // ===========================================================================
 
 // displayBalance renders account balance information as a key-value display.
+// Handles margin, pdt, and cash account types which each have their own buying power sub-object.
 func displayBalance(data []byte) {
 	root := parseJSON(data)
 	if root == nil {
@@ -302,23 +303,45 @@ func displayBalance(data []byte) {
 		{"Close P/L", money(num(b, "close_pl"))},
 		{"Stock Long Value", money(num(b, "stock_long_value"))},
 		{"Option Long Value", money(num(b, "option_long_value"))},
+		{"Option Short Value", money(num(b, "option_short_value"))},
+		{"Short Market Value", money(num(b, "short_market_value"))},
+		{"Current Requirement", money(num(b, "current_requirement"))},
 		{"Uncleared Funds", money(num(b, "uncleared_funds"))},
 		{"Pending Cash", money(num(b, "pending_cash"))},
 		{"Pending Orders", str(b, "pending_orders_count")},
 	}
 	printKV(pairs)
 
-	margin := nested(b, "margin")
-	if margin != nil {
-		fmt.Println()
-		fmt.Println("Margin:")
-		marginPairs := [][2]string{
-			{"  Stock Buying Power", money(num(margin, "stock_buying_power"))},
-			{"  Option Buying Power", money(num(margin, "option_buying_power"))},
-			{"  Fed Call", money(num(margin, "fed_call"))},
-			{"  Maintenance Call", money(num(margin, "maintenance_call"))},
+	// Buying power is nested under the account type key (margin, pdt, or cash)
+	accountType := str(b, "account_type")
+	bp := nested(b, accountType)
+	if bp == nil {
+		// Fallback: try common account type keys
+		for _, key := range []string{"pdt", "margin", "cash"} {
+			if bp = nested(b, key); bp != nil {
+				break
+			}
 		}
-		printKV(marginPairs)
+	}
+
+	if bp != nil {
+		fmt.Println()
+		fmt.Println("Buying Power:")
+		bpPairs := [][2]string{
+			{"Stock Buying Power", money(num(bp, "stock_buying_power"))},
+			{"Option Buying Power", money(num(bp, "option_buying_power"))},
+		}
+		if v := num(bp, "day_trade_buying_power"); v != 0 {
+			bpPairs = append(bpPairs, [2]string{"Day Trade Buying Power", money(v)})
+		}
+		bpPairs = append(bpPairs,
+			[2]string{"Fed Call", money(num(bp, "fed_call"))},
+			[2]string{"Maintenance Call", money(num(bp, "maintenance_call"))},
+		)
+		if v := num(bp, "stock_short_value"); v != 0 {
+			bpPairs = append(bpPairs, [2]string{"Stock Short Value", money(v)})
+		}
+		printKV(bpPairs)
 	}
 }
 
