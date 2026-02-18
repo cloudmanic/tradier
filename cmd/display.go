@@ -380,6 +380,7 @@ func displayHistoricalBalances(data []byte) {
 }
 
 // displayHistory renders account history events as a table.
+// Each event has a type (trade, ach, fee, etc.) with details nested under that type key.
 func displayHistory(data []byte) {
 	root := parseJSON(data)
 	if root == nil {
@@ -397,14 +398,37 @@ func displayHistory(data []byte) {
 	headers := []string{"DATE", "TYPE", "SYMBOL", "QTY", "PRICE", "AMOUNT", "DESCRIPTION"}
 	rows := make([][]string, 0, len(events))
 	for _, e := range events {
+		eventType := str(e, "type")
+		symbol := ""
+		qty := ""
+		price := ""
+		desc := ""
+
+		// Details are nested under the event type key (trade, ach, fee, etc.)
+		if detail, ok := e[eventType]; ok {
+			if dm, ok := detail.(map[string]interface{}); ok {
+				symbol = str(dm, "symbol")
+				if q := num(dm, "quantity"); q != 0 {
+					qty = fmt.Sprintf("%.0f", q)
+				}
+				price = money(num(dm, "price"))
+				desc = str(dm, "description")
+			}
+		}
+
+		// Format option symbols for readability
+		if symbol != "" {
+			symbol = formatOptionSymbol(symbol)
+		}
+
 		rows = append(rows, []string{
 			shortDate(str(e, "date")),
-			str(e, "type"),
-			str(e, "symbol"),
-			str(e, "quantity"),
-			money(num(e, "price")),
+			eventType,
+			symbol,
+			qty,
+			price,
 			money(num(e, "amount")),
-			str(e, "description"),
+			desc,
 		})
 	}
 	printTable(headers, rows)
