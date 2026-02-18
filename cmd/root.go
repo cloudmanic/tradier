@@ -15,6 +15,9 @@ import (
 // jsonOutput controls whether output is rendered as JSON instead of tables.
 var jsonOutput bool
 
+// sandboxMode controls whether the CLI uses the sandbox environment.
+var sandboxMode bool
+
 // version is the current version of the CLI, injected at build time
 // via -ldflags "-X github.com/cloudmanic/tradier/cmd.version=vX.Y.Z".
 // Defaults to "dev" for local development builds.
@@ -31,6 +34,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON instead of formatted tables")
+	rootCmd.PersistentFlags().BoolVar(&sandboxMode, "sandbox", false, "Use the Tradier sandbox environment")
 }
 
 // Execute runs the root command and exits on error.
@@ -41,12 +45,23 @@ func Execute() {
 }
 
 // loadClientFromConfig reads the config file and returns a configured API client.
+// Uses the --sandbox flag to determine which API key and base URL to use.
 func loadClientFromConfig() (*client.Client, *config.Config, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load config: %w\nRun 'tradier init' to configure your API key", err)
 	}
-	c := client.NewClient(cfg.BaseURL(), cfg.APIKey)
+
+	apiKey := cfg.APIKey(sandboxMode)
+	if apiKey == "" {
+		env := "production"
+		if sandboxMode {
+			env = "sandbox"
+		}
+		return nil, nil, fmt.Errorf("no %s API key configured. Run 'tradier init' to set it up", env)
+	}
+
+	c := client.NewClient(cfg.BaseURL(sandboxMode), apiKey)
 	return c, cfg, nil
 }
 
@@ -65,10 +80,11 @@ func printResult(data []byte, tableFunc func([]byte)) {
 }
 
 // requireAccountID returns the account ID from the flag or config, erroring if neither is set.
+// Uses the --sandbox flag to determine which account ID to use from config.
 func requireAccountID(cmd *cobra.Command, cfg *config.Config) (string, error) {
 	accountID, _ := cmd.Flags().GetString("account-id")
 	if accountID == "" {
-		accountID = cfg.AccountID
+		accountID = cfg.AccountID(sandboxMode)
 	}
 	if accountID == "" {
 		return "", fmt.Errorf("--account-id is required (or set account_id in config via 'tradier init')")

@@ -13,52 +13,73 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// initCmd initializes the tradier configuration by prompting for an API key and storing it in ~/.config/tradier/.
+// initCmd initializes the tradier configuration by prompting for API keys and storing them in ~/.config/tradier/.
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize the Tradier CLI configuration",
-	Long:  "Prompts for your Tradier API key and optional account ID, then saves the configuration to ~/.config/tradier/config.json.",
+	Long:  "Prompts for your Tradier production and sandbox API keys and optional account IDs, then saves the configuration to ~/.config/tradier/config.json.",
 	RunE:  runInit,
 }
 
 func init() {
-	initCmd.Flags().Bool("sandbox", false, "Use the Tradier sandbox environment instead of production")
 	rootCmd.AddCommand(initCmd)
 }
 
-// runInit prompts the user for API credentials and saves them to the config file.
+// runInit prompts the user for both production and sandbox API credentials and saves them to the config file.
 func runInit(cmd *cobra.Command, args []string) error {
-	sandbox, _ := cmd.Flags().GetBool("sandbox")
-
 	reader := bufio.NewReader(os.Stdin)
 
-	if sandbox {
-		fmt.Println("Configuring for Tradier SANDBOX environment")
-	} else {
-		fmt.Println("Configuring for Tradier PRODUCTION environment")
+	fmt.Println("Tradier CLI Configuration")
+	fmt.Println("=========================")
+	fmt.Println()
+
+	// Production credentials
+	fmt.Println("-- Production Environment --")
+	fmt.Print("Enter your production API key (press Enter to skip): ")
+	prodAPIKey, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read input: %w", err)
+	}
+	prodAPIKey = strings.TrimSpace(prodAPIKey)
+
+	prodAccountID := ""
+	if prodAPIKey != "" {
+		fmt.Print("Enter your production account ID (optional, press Enter to skip): ")
+		prodAccountID, err = readLine(reader)
+		if err != nil {
+			return err
+		}
 	}
 
-	fmt.Print("Enter your Tradier API key: ")
-	apiKey, err := reader.ReadString('\n')
+	fmt.Println()
+
+	// Sandbox credentials
+	fmt.Println("-- Sandbox Environment --")
+	fmt.Print("Enter your sandbox API key (press Enter to skip): ")
+	sandboxAPIKey, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read API key: %w", err)
+		return fmt.Errorf("failed to read input: %w", err)
 	}
-	apiKey = strings.TrimSpace(apiKey)
-	if apiKey == "" {
-		return fmt.Errorf("API key cannot be empty")
+	sandboxAPIKey = strings.TrimSpace(sandboxAPIKey)
+
+	sandboxAccountID := ""
+	if sandboxAPIKey != "" {
+		fmt.Print("Enter your sandbox account ID (optional, press Enter to skip): ")
+		sandboxAccountID, err = readLine(reader)
+		if err != nil {
+			return err
+		}
 	}
 
-	fmt.Print("Enter your default account ID (optional, press Enter to skip): ")
-	accountID, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to read account ID: %w", err)
+	if prodAPIKey == "" && sandboxAPIKey == "" {
+		return fmt.Errorf("at least one API key (production or sandbox) is required")
 	}
-	accountID = strings.TrimSpace(accountID)
 
 	cfg := &config.Config{
-		APIKey:    apiKey,
-		Sandbox:   sandbox,
-		AccountID: accountID,
+		ProductionAPIKey:    prodAPIKey,
+		ProductionAccountID: prodAccountID,
+		SandboxAPIKey:       sandboxAPIKey,
+		SandboxAccountID:    sandboxAccountID,
 	}
 
 	if err := config.Save(cfg); err != nil {
@@ -66,12 +87,27 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	configPath, _ := config.ConfigFilePath()
+	fmt.Println()
 	fmt.Printf("Configuration saved to %s\n", configPath)
-	if sandbox {
-		fmt.Printf("Base URL: %s\n", config.SandboxBaseURL)
-	} else {
-		fmt.Printf("Base URL: %s\n", config.ProductionBaseURL)
+
+	if prodAPIKey != "" {
+		fmt.Printf("Production: %s (key configured)\n", config.ProductionBaseURL)
+	}
+	if sandboxAPIKey != "" {
+		fmt.Printf("Sandbox:    %s (key configured)\n", config.SandboxBaseURL)
 	}
 
+	fmt.Println()
+	fmt.Println("Use --sandbox flag on any command to use the sandbox environment.")
+
 	return nil
+}
+
+// readLine reads a single line from the reader and trims whitespace.
+func readLine(reader *bufio.Reader) (string, error) {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("failed to read input: %w", err)
+	}
+	return strings.TrimSpace(line), nil
 }

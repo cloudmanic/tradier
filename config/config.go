@@ -25,10 +25,13 @@ const (
 )
 
 // Config holds the configuration for the Tradier CLI tool.
+// Both production and sandbox credentials are stored so users can
+// switch between environments with the --sandbox flag.
 type Config struct {
-	APIKey    string `json:"api_key"`
-	Sandbox   bool   `json:"sandbox"`
-	AccountID string `json:"account_id"`
+	ProductionAPIKey    string `json:"production_api_key"`
+	ProductionAccountID string `json:"production_account_id"`
+	SandboxAPIKey       string `json:"sandbox_api_key"`
+	SandboxAccountID    string `json:"sandbox_account_id"`
 }
 
 // ConfigDirPath returns the full path to the tradier configuration directory.
@@ -93,10 +96,26 @@ func Save(cfg *Config) error {
 	return nil
 }
 
-// BaseURL returns the appropriate base URL based on the sandbox setting.
-func (c *Config) BaseURL() string {
-	if c.Sandbox {
+// BaseURL returns the appropriate base URL based on the sandbox flag.
+func (c *Config) BaseURL(sandbox bool) string {
+	if sandbox {
 		return SandboxBaseURL
 	}
 	return ProductionBaseURL
+}
+
+// APIKey returns the appropriate API key based on the sandbox flag.
+func (c *Config) APIKey(sandbox bool) string {
+	if sandbox {
+		return c.SandboxAPIKey
+	}
+	return c.ProductionAPIKey
+}
+
+// AccountID returns the appropriate account ID based on the sandbox flag.
+func (c *Config) AccountID(sandbox bool) string {
+	if sandbox {
+		return c.SandboxAccountID
+	}
+	return c.ProductionAccountID
 }
